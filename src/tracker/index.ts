@@ -1,7 +1,5 @@
 export { trigger, track } from "./TrackerType";
 
-export { tracker, triggers } from "./tracker";
+export { tracker, triggers, params } from "./tracker";
 
-export {
-  domAnalytics
-} from './trackerInterpreter'
+export { mountTracking } from "./trackerInterpreter";

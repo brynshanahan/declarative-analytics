@@ -1,5 +1,6 @@
 export const TRACK = "T" as const;
 export const TRIGGER = "R" as const;
+export const PARAM = "P" as const;
 
 export type DomEvent = string & {};
 export type AnalyticsEvent = string & {};
@@ -37,9 +38,9 @@ export interface TrackingHost<NodeType> {
     params?: { [k: string]: JSONPrimitive };
   }): { [k: string]: string };
 
-  getParamElementProps(params: {
-    [k: string]: JSONPrimitive;
-  }): { [k: string]: string };
+  getParamElementProps(params: { [k: string]: JSONPrimitive }): {
+    [k: string]: string;
+  };
 
   getTrackerElements(root: NodeType): Iterable<NodeType>;
 
@@ -62,9 +63,12 @@ export interface TrackingHost<NodeType> {
   connect(
     node: NodeType,
     onAdded: (element: NodeType) => any,
-    onChanged: (element: NodeType) => any,
+    onChanged: (element: NodeType, attribute: string | null) => any,
     onRemoved: (element: NodeType) => any
   ): DisposeHandler;
+
+  isTrackerElement(element: NodeType): boolean;
+  isTriggerElement(element: NodeType): boolean;
 }
 
 export function isTracker(value: any): value is TrackEvent {

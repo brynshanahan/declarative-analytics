@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Input } from "./components/Input";
 import { LogEvents } from "./components/LogEvents";
-import { params, tracker, track } from "./tracker/tracker";
+import { params, tracker, track } from "./tracker";
 
 const appParams = params({
   user: {
@@ -16,18 +17,31 @@ export default function App() {
     track: [track("submit", null, "myApplicationSubmitEvent")],
   });
 
+  const [open, setOpen] = useState(false);
+
   return (
     <div {...appParams}>
-      <form
-        {...transactionTracking}
-        onSubmit={(e) => {
-          e.preventDefault();
+      {open ? "Open" : "Closed"}
+      {
+        <form
+          {...(open && transactionTracking)}
+          onSubmit={(e) => {
+            e.preventDefault();
+          }}
+        >
+          <Input />
+          <Button>Submit</Button>
+        </form>
+      }
+      <LogEvents />
+      <button
+        type="button"
+        onClick={(e) => {
+          setOpen(!open);
         }}
       >
-        <Input />
-        <Button>Submit</Button>
-      </form>
-      <LogEvents />
+        Toggle
+      </button>
       <div tabIndex={0} />
     </div>
   );

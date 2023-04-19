@@ -1,9 +1,9 @@
-import { useReducer, useState } from "react";
-import { onSendEvent } from "../tracker/trackerInterpreter";
+import { useReducer } from "react";
+import { onDataLayerPushListeners } from "../dataLayer";
 
 let updater = () => {};
 
-onSendEvent(() => {
+onDataLayerPushListeners.add(() => {
   updater();
 });
 

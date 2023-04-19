@@ -1,0 +1,57 @@
+Arguments: 
+  /usr/local/bin/node /usr/local/bin/yarn add immer
+
+PATH: 
+  /bin:/usr/bin:/usr/local/bin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  16.14.2
+
+Platform: 
+  linux x64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/typescript: ESOCKETTIMEDOUT
+      at ClientRequest.eval (file:///usr/local/lib/node_modules/yarn/dist/yarn.js:125484:19)
+      at Object.onceWrapper (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:154161)
+      at EventEmitter.emit (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:156830)
+      at TLSSocket.emitRequestTimeout (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:1193622)
+      at Object.onceWrapper (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:154161)
+      at EventEmitter.emit (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:156946)
+      at Socket._onTimeout (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:303095)
+      at listOnTimeout (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:358767)
+      at processTimers (https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:35:359594)
+      at https://vitejsvitejcjmmu-howd.w-credentialless.staticblitz.com/blitz.c8358679.js:44:270537
+
+npm manifest: 
+  {
+    "name": "vite-react-typescript-starter",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+      "dev": "vite",
+      "build": "tsc && vite build",
+      "preview": "vite preview"
+    },
+    "dependencies": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0"
+    },
+    "devDependencies": {
+      "@types/react": "^18.0.28",
+      "@types/react-dom": "^18.0.11",
+      "@vitejs/plugin-react": "^4.0.0-beta.0",
+      "typescript": "^5.0.2",
+      "vite": "^4.3.0-beta.2"
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

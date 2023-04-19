@@ -367,12 +367,12 @@ export function mountTracking<NodeType>(
         if (eventName === "unmount") {
           instance.unmount.add(
             addElDisposer(() => {
-              sendEvent(eventName, trackerEl);
+              sendEvent(trackerEl, tracker);
             })
           );
         } else if (eventName === "mount") {
           if (isFirstMount) {
-            sendEvent(element, tracker);
+            sendEvent(trackerEl, tracker);
           }
         }
       }

@@ -17,7 +17,11 @@ export function LogEvents() {
   return (
     <div>
       {logs.map((log, i) => {
-        return <div key={i}>{JSON.stringify(log)}</div>;
+        return (
+          <pre style={{ fontSize: 11 }} key={i}>
+            <code>{JSON.stringify(log)}</code>
+          </pre>
+        );
       })}
     </div>
   );

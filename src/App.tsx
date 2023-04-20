@@ -1,22 +1,22 @@
 import { useState } from "react";
 import { Input } from "./components/Input";
 import { LogEvents } from "./components/LogEvents";
-import { params, tracker, track } from "./tracker";
+import { trackerParams, tracker, track } from "./tracker";
 
-const appParams = params({
+const appParams = trackerParams({
   user: {
     id: 1,
   },
 });
 
-export default function App() {
-  const transactionTracking = tracker({
-    params: {
-      transaction_name: "My Transaction",
-    },
-    track: [track("submit", null, "myApplicationSubmitEvent")],
-  });
+const transactionTracking = tracker({
+  params: {
+    transaction_name: "My Transaction",
+  },
+  track: [track("submit", null, "myApplicationSubmitEvent")],
+});
 
+export default function App() {
   const [open, setOpen] = useState(false);
 
   return (
@@ -36,7 +36,7 @@ export default function App() {
       <LogEvents />
       <button
         type="button"
-        onClick={(e) => {
+        onClick={() => {
           setOpen(!open);
         }}
       >

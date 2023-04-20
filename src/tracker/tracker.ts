@@ -45,7 +45,7 @@ export function tracker(args: {
   });
 }
 
-export function params(params: Record<string, JSONPrimitive>) {
+export function trackerParams(params: Record<string, JSONPrimitive>) {
   return getParamElementProps(params);
 }
 

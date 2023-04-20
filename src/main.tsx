@@ -1,16 +1,18 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.tsx";
+import App from "./App";
 import "./index.css";
-import { mountTracking } from "./tracker/trackerInterpreter";
-import { getUserPreferencesEnabled } from "./tracker/DomTracker.ts";
-import { dataLayer, onDataLayerPushListeners } from "./dataLayer.tsx";
+import { getUserPreferencesEnabled } from "./tracker/DomTracker";
+import { dataLayer, onDataLayerPushListeners } from "./dataLayer";
 
 const root = document.getElementById("root") as HTMLElement;
 
 if (getUserPreferencesEnabled()) {
-  import("./tracker/DomTracker.ts").then((module) => {
-    mountTracking(root, module, (eventName, ctx) => {
+  Promise.all([
+    import("./tracker/trackerInterpreter"),
+    import("./tracker/DomTracker"),
+  ]).then(([{ mountTracking }, domTracker]) => {
+    const sendEventToGADataLayer = (eventName: string, ctx: {}) => {
       dataLayer.push({
         event: eventName,
         ...ctx,
@@ -19,7 +21,8 @@ if (getUserPreferencesEnabled()) {
       for (const listener of onDataLayerPushListeners) {
         listener();
       }
-    });
+    };
+    mountTracking(root, domTracker, sendEventToGADataLayer);
   });
 }
 

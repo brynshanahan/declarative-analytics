@@ -12,6 +12,7 @@ export function tracker(args: {
   package?: string;
   track: TrackEvent[];
   params?: { [k: string]: JSONPrimitive };
+  enabled?: boolean;
 }) {
   const { name, component, package: pkg, track, params } = args;
   let paramsToAttach: any = undefined;
@@ -32,6 +33,10 @@ export function tracker(args: {
       if (component) {
         paramsToAttach.component = component;
       }
+    }
+
+    if (args.enabled !== undefined) {
+      paramsToAttach.selfEnabled = args.enabled;
     }
 
     if (params) {

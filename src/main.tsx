@@ -12,7 +12,7 @@ if (getUserPreferencesEnabled()) {
     import("./tracker/trackerInterpreter"),
     import("./tracker/DomTracker"),
   ]).then(([{ mountTracking }, domTracker]) => {
-    const sendEventToGADataLayer = (eventName: string, ctx: {}) => {
+    const sendToGa = (eventName: string, ctx: {}) => {
       dataLayer.push({
         event: eventName,
         ...ctx,
@@ -22,7 +22,7 @@ if (getUserPreferencesEnabled()) {
         listener();
       }
     };
-    mountTracking(root, domTracker, sendEventToGADataLayer);
+    mountTracking(root, domTracker, sendToGa);
   });
 }
 

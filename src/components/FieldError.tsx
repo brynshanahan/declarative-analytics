@@ -1,11 +1,16 @@
 import { trigger, triggers } from "../tracker";
 
-const errorTriggers = triggers([
-  trigger("mount", "error"),
-  trigger("unmount", "resolved"),
-]);
-
-export function FieldError({ children }: { children: any }) {
+export function FieldError({
+  children,
+  inputId,
+}: {
+  children: any;
+  inputId: string;
+}) {
+  const errorTriggers = triggers([
+    trigger("mount", "error", "#" + inputId),
+    trigger("unmount", "resolved"),
+  ]);
   return (
     <span {...errorTriggers}>
       <span>{children}</span>

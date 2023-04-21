@@ -4,17 +4,26 @@ import {
   TrackingHost,
   TrackEvent,
   TriggerEvent,
+  TRACK,
+  TRIGGER,
+  JSONDict,
 } from "./TrackerType";
 
 export function attributeName(key: string) {
   return `data-tr-${key}`;
 }
 
-export const PARAMS_KEY = attributeName("params");
-export const TRACKERS_KEY = attributeName("trackers");
-export const TRIGGERS_KEY = attributeName("triggers");
+const PARAMS_KEY = attributeName("params");
+const TRACKERS_KEY = attributeName("trackers");
+const TRIGGERS_KEY = attributeName("triggers");
+const TRACKERS_EVENT_DELIMITER = " ";
+const TRACKERS_DELIMITER = "||";
+const TRIGGERS_EVENT_DELIMITER = " ";
+const TRIGGERS_DELIMITER = "||";
 
-function parse<T>(value: string | null): T | undefined {
+type DomTracker = TrackingHost<HTMLElement>;
+
+function parse<T = {}>(value: string | null): T | undefined {
   if (!value) return undefined;
   try {
     return JSON.parse(value);
@@ -48,10 +57,11 @@ function deepStableObj<T extends any>(val: T): T {
 
   return val;
 }
-const TRACKERS_EVENT_DELIMITER = " ";
-const TRACKERS_DELIMITER = ",";
-const TRIGGERS_EVENT_DELIMITER = " ";
-const TRIGGERS_DELIMITER = ",";
+
+function serializeParams(obj: JSONDict) {
+  return JSON.stringify(deepStableObj(obj));
+}
+
 function elPath(element: HTMLElement) {
   let path = element.tagName.toLowerCase();
   let target = element.parentElement;
@@ -88,8 +98,6 @@ function elementValue(element: HTMLElement | null) {
   return null;
 }
 
-type DomTracker = TrackingHost<HTMLElement>;
-
 export const getTrackers: DomTracker["getTrackers"] = (element) => {
   const attr = element.getAttribute(TRACKERS_KEY);
 
@@ -98,8 +106,11 @@ export const getTrackers: DomTracker["getTrackers"] = (element) => {
   const trackers: TrackEvent[] = [];
 
   for (let trackerAttr of attr.split(TRACKERS_DELIMITER)) {
-    const tracker = trackerAttr.split(TRACKERS_EVENT_DELIMITER);
-    console.log(tracker);
+    const tracker = [TRACK, ...trackerAttr.split(TRACKERS_EVENT_DELIMITER)];
+
+    if (tracker[4]) {
+      tracker[4] = parse<{}>(tracker[4]) as any;
+    }
 
     if (isTracker(tracker)) {
       trackers.push(tracker);
@@ -122,7 +133,11 @@ export const getTriggers: DomTracker["getTriggers"] = (element) => {
   const triggers: TriggerEvent[] = [];
 
   for (let triggerAttr of attr.split(TRIGGERS_DELIMITER)) {
-    const trigger = triggerAttr.split(TRIGGERS_EVENT_DELIMITER);
+    const trigger = [TRIGGER, ...triggerAttr.split(TRIGGERS_EVENT_DELIMITER)];
+
+    if (trigger[4]) {
+      trigger[4] = parse<{}>(trigger[4]) as any;
+    }
 
     if (isTrigger(trigger)) {
       triggers.push(trigger);
@@ -149,7 +164,9 @@ export const getEventTargetElement: DomTracker["getEventTargetElement"] = (
   element,
   selector
 ) => {
+  if (!selector) return element;
   let sel = selector;
+
   switch (sel.charAt(0)) {
     case ">":
     case "+":
@@ -219,27 +236,31 @@ export const getTrackerElementProps: DomTracker["getTrackerElementProps"] = (
   let trackers: string[] = [];
 
   for (let tracker of config.track) {
-    const [type, domEvent, analyticsEvent, targetSelector] = tracker;
+    const [_type, domEvent, analyticsEvent, targetSelector, params] = tracker;
 
     if (targetSelector?.includes(TRACKERS_DELIMITER)) {
       throw new Error(`Tracker selector can't contain '${TRACKERS_DELIMITER}'`);
     }
 
-    let trackerAttr: string = `${type}${TRACKERS_EVENT_DELIMITER}${domEvent}`;
+    let trackerAttr: string = `${domEvent}`;
 
     if (analyticsEvent) {
       trackerAttr += `${TRACKERS_EVENT_DELIMITER}${analyticsEvent}`;
+    } else if (targetSelector || params) {
+      trackerAttr += TRACKERS_EVENT_DELIMITER;
     }
 
     if (targetSelector) {
-      if (!analyticsEvent) {
-        trackerAttr += TRACKERS_EVENT_DELIMITER;
-      }
-
       trackerAttr += `${TRACKERS_EVENT_DELIMITER}${targetSelector.replaceAll(
         TRACKERS_EVENT_DELIMITER,
         ""
       )}`;
+    } else if (params) {
+      trackerAttr += TRACKERS_EVENT_DELIMITER;
+    }
+
+    if (params) {
+      trackerAttr += `${TRACKERS_EVENT_DELIMITER}${serializeParams(params)}`;
     }
 
     trackers.push(trackerAttr);
@@ -259,7 +280,7 @@ export const getParamElementProps: DomTracker["getParamElementProps"] = (
   params
 ) => {
   return {
-    [PARAMS_KEY]: JSON.stringify(deepStableObj(params)),
+    [PARAMS_KEY]: serializeParams(params),
   };
 };
 export const getTriggerElementProps: DomTracker["getTriggerElementProps"] = (
@@ -267,11 +288,32 @@ export const getTriggerElementProps: DomTracker["getTriggerElementProps"] = (
 ) => {
   let triggerAttrs: string[] = [];
 
-  for (let [type, domEvent, analyticsEvent] of triggers) {
-    let triggerAttr = `${type}${TRIGGERS_EVENT_DELIMITER}${domEvent}`;
+  for (let [
+    _type,
+    domEvent,
+    analyticsEvent,
+    targetSelector,
+    params,
+  ] of triggers) {
+    let triggerAttr = `${domEvent}`;
 
     if (analyticsEvent) {
       triggerAttr += `${TRIGGERS_EVENT_DELIMITER}${analyticsEvent}`;
+    } else if (params || targetSelector) {
+      triggerAttr += `${TRIGGERS_EVENT_DELIMITER}`;
+    }
+
+    if (targetSelector) {
+      triggerAttr += `${TRIGGERS_EVENT_DELIMITER}${targetSelector.replaceAll(
+        TRIGGERS_EVENT_DELIMITER,
+        ""
+      )}`;
+    } else {
+      triggerAttr += `${TRIGGERS_EVENT_DELIMITER}`;
+    }
+
+    if (params) {
+      triggerAttr += `${TRIGGERS_EVENT_DELIMITER}${serializeParams(params)}`;
     }
 
     triggerAttrs.push(triggerAttr);
@@ -282,16 +324,20 @@ export const getTriggerElementProps: DomTracker["getTriggerElementProps"] = (
   };
 };
 
-export const on: DomTracker["on"] = (element, event, callback) => {
+export const attachListener: DomTracker["attachListener"] = (
+  element,
+  event,
+  callback
+) => {
   if (event === "change") {
     let value: any;
 
-    const offFocus = on(element, "focus", () => {
+    const offFocus = attachListener(element, "focus", () => {
       value = elementValue(element);
     });
-    const offBlur = on(element, "blur", () => {
+    const offBlur = attachListener(element, "blur", (...args) => {
       if (value !== elementValue(element)) {
-        callback();
+        callback(...args);
       }
     });
 
@@ -301,9 +347,13 @@ export const on: DomTracker["on"] = (element, event, callback) => {
     };
   }
 
-  element.addEventListener(event, callback);
+  const listener = (e: Event) => {
+    callback(e.currentTarget as any, e.target as any, e);
+  };
+
+  element.addEventListener(event, listener);
   return () => {
-    element.removeEventListener(event, callback);
+    element.removeEventListener(event, listener);
   };
 };
 

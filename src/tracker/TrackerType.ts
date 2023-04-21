@@ -14,12 +14,21 @@ export type JSONPrimitive =
   | { [k: string]: JSONPrimitive }
   | JSONPrimitive[];
 
-export type TriggerEvent = [typeof TRIGGER, DomEvent, AnalyticsEvent?];
+export type JSONDict = { [k: string]: JSONPrimitive };
+
+export type TriggerEvent = [
+  typeof TRIGGER,
+  DomEvent,
+  AnalyticsEvent?,
+  TargetSelector?,
+  JSONDict?
+];
 export type TrackEvent = [
   typeof TRACK,
   DomEvent,
   AnalyticsEvent?,
-  TargetSelector?
+  TargetSelector?,
+  JSONDict?
 ];
 
 export interface DisposeHandler {
@@ -31,14 +40,13 @@ export interface TrackingHost<NodeType> {
 
   getTriggers(element: NodeType): undefined | TriggerEvent[];
 
-  getParams(element: NodeType): undefined | { [k: string]: JSONPrimitive };
+  getParams(element: NodeType): undefined | JSONDict;
 
-  getTrackerElementProps(config: {
-    track: TrackEvent[];
-    params?: { [k: string]: JSONPrimitive };
-  }): { [k: string]: string };
+  getTrackerElementProps(config: { track: TrackEvent[]; params?: JSONDict }): {
+    [k: string]: string;
+  };
 
-  getParamElementProps(params: { [k: string]: JSONPrimitive }): {
+  getParamElementProps(params: JSONDict): {
     [k: string]: string;
   };
 
@@ -48,11 +56,19 @@ export interface TrackingHost<NodeType> {
 
   getParamElements(root: NodeType): Iterable<NodeType>;
 
-  getEventTargetElement(element: NodeType, selector: string): NodeType;
+  getEventTargetElement(element: NodeType, selector?: string): NodeType;
 
   getTriggerElementProps(triggers: TriggerEvent[]): { [k: string]: string };
 
-  on(element: NodeType, event: DomEvent, callback: () => any): DisposeHandler;
+  attachListener(
+    element: NodeType,
+    event: DomEvent,
+    callback: (
+      currentTarget: NodeType,
+      target: NodeType,
+      event: { [k: string]: any }
+    ) => any
+  ): DisposeHandler;
 
   isParentOf(parent: NodeType, child: NodeType): boolean;
 
@@ -79,13 +95,19 @@ export function isTrigger(value: any): value is TriggerEvent {
   return Array.isArray(value) && value[0] === TRIGGER;
 }
 
-export function trigger(domEvent: DomEvent, analyticsEvent: AnalyticsEvent) {
-  return [TRIGGER, domEvent, analyticsEvent] as TriggerEvent;
+export function trigger(
+  domEvent: DomEvent,
+  analyticsEvent: AnalyticsEvent,
+  target?: TargetSelector | null,
+  params?: JSONDict
+) {
+  return [TRIGGER, domEvent, analyticsEvent, target, params] as TriggerEvent;
 }
 export function track(
   domEvent: DomEvent,
   target?: TargetSelector | null,
-  analyticsEvent?: AnalyticsEvent | null
+  analyticsEvent?: AnalyticsEvent | null,
+  params?: JSONDict
 ) {
-  return [TRACK, domEvent, analyticsEvent, target] as TrackEvent;
+  return [TRACK, domEvent, analyticsEvent, target, params] as TrackEvent;
 }

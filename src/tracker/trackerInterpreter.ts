@@ -1,4 +1,4 @@
-import { set } from "./getset";
+import { get, set } from "./getset";
 import {
   DisposeHandler,
   isTracker,
@@ -11,6 +11,27 @@ import {
 } from "./TrackerType";
 
 const PARAM_NEEDS_RECOMPUTE = null;
+
+function hasOwn(
+  obj: { [k: string]: any },
+  key: string | number
+): key is keyof typeof obj {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function hasFalsyAttr(value: any) {
+  return (
+    (hasAttr(value) && value === false) || (value === "false" && value === "0")
+  );
+}
+
+function hasAttr(value: any) {
+  return value !== undefined || value !== "";
+}
+
+const EMPTY_EVENT = {};
+
+type Dict<K extends string = string, V = any> = Record<K, V>;
 
 export function mountTracking<NodeType>(
   rootElement: NodeType,
@@ -32,7 +53,7 @@ export function mountTracking<NodeType>(
   const trackerStore = new Map<NodeType, TrackerInstance>();
   const paramsStore = new Map<
     NodeType,
-    {} | typeof PARAM_NEEDS_RECOMPUTE | undefined
+    Dict | typeof PARAM_NEEDS_RECOMPUTE | undefined
   >();
   const triggersStore = new Map<NodeType, any>();
   const disposersStore = new Map<
@@ -106,15 +127,18 @@ export function mountTracking<NodeType>(
     return contextElements.reverse();
   }
 
-  function getCtx(element: NodeType) {
-    let ctx = {};
+  function getCtx(element: NodeType, extraParams?: Dict) {
+    let ctx: { [k: string]: any } = {};
+    let props: { [k: string]: any } = {};
     let ctxEls = ctxParents.get(element);
+    let pathsToResolve: [string[], string][] = [];
+    const result = [ctx, props, pathsToResolve] as const;
 
     if (ctxEls) {
       for (let ctxEl of ctxEls) {
         let param = paramsStore.get(ctxEl);
 
-        if (param === null) {
+        if (param === PARAM_NEEDS_RECOMPUTE) {
           param = host.getParams(ctxEl);
           paramsStore.set(ctxEl, param);
         }
@@ -123,23 +147,114 @@ export function mountTracking<NodeType>(
         }
 
         for (let prop in param) {
-          if (Object.hasOwn(param, prop)) {
-            // @ts-ignore
-            set(ctx, prop.split("."), param[prop]);
+          if (prop === "selfEnabled") {
+            if (ctxEl === element && hasFalsyAttr(param[prop])) {
+              props.enabled = false;
+              return result;
+            } else {
+              continue;
+            }
+          }
+
+          if (prop === "enabled") {
+            if (hasFalsyAttr(param[prop])) {
+              props.enabled = false;
+              return result;
+            } else {
+              continue;
+            }
+          }
+
+          if (hasOwn(param, prop)) {
+            const path = prop.split(".");
+            const value = param[prop];
+
+            if (typeof value === "string" && value.charAt(0) === "$") {
+              pathsToResolve.push([path, value]);
+            }
+
+            set(ctx, path, value, true);
+
+            if (element === ctxEl) {
+              set(props, path, value, true);
+            }
           }
         }
       }
     }
 
-    return ctx;
+    if (extraParams) {
+      for (let prop in extraParams) {
+        if (hasOwn(extraParams, prop)) {
+          const path = prop.split(".");
+          const value = extraParams[prop];
+
+          if (typeof value === "string" && value.charAt(0) === "$") {
+            pathsToResolve.push([path, value]);
+          }
+
+          set(ctx, path, value, true);
+        }
+      }
+    }
+
+    return result;
   }
 
-  function sendEvent(element: NodeType, event: TrackEvent | TriggerEvent) {
-    const eventName = event[2] || event[1];
-    const ctx = getCtx(element);
-    if (isTracker(event) || isTrigger(event)) {
-      onSendEvent(eventName, ctx);
+  function sendEvent(
+    eventType: TrackEvent | TriggerEvent,
+    trackerEl: NodeType,
+    triggerEl: NodeType | null,
+    currentTargetEl: NodeType,
+    targetEl: NodeType,
+    event: { [k: string]: any }
+  ) {
+    const isTrackerEvent = isTracker(eventType);
+
+    if (!isTrackerEvent && !isTrigger(eventType)) {
+      return;
     }
+
+    const eventName = eventType[2] || eventType[1];
+    let [ctx, props, pathsToResolve] = getCtx(
+      trackerEl,
+      isTrackerEvent ? eventType[4] : eventType[3]
+    );
+
+    if (props.enabled === false) {
+      return;
+    }
+
+    if (pathsToResolve) {
+      for (let [path, value] of pathsToResolve) {
+        let targetPath = value.split(".");
+        while (targetPath.length && targetPath[0].charAt(0) === "$") {
+          let prop = targetPath.shift();
+          switch (prop) {
+            case "$currentTarget":
+              set(ctx, path, get(currentTargetEl as any, targetPath));
+              break;
+            case "$target":
+              set(ctx, path, get(targetEl as any, targetPath));
+              break;
+            case "$tracker":
+              set(ctx, path, get(trackerEl as any, targetPath));
+              break;
+            case "$trigger":
+              set(ctx, path, get(triggerEl as any, targetPath));
+              break;
+            case "$event":
+              set(ctx, path, get(event, targetPath));
+              break;
+            default:
+              console.log("err");
+              throw new Error("Invalid path: " + value);
+          }
+        }
+      }
+    }
+
+    onSendEvent(eventName, ctx);
   }
 
   function dispose(element: NodeType | TrackerInstance | TriggerInstance) {
@@ -167,6 +282,7 @@ export function mountTracking<NodeType>(
     paramsStore.delete(element);
     trackerStore.delete(element);
     triggersStore.delete(element);
+    ctxParents.delete(element);
   }
 
   // Happens on attribute change and
@@ -199,14 +315,28 @@ export function mountTracking<NodeType>(
         if (eventName === "unmount") {
           addInstanceDisposer(
             () => {
-              sendEvent(trackerEl, tracker);
+              sendEvent(
+                tracker,
+                trackerEl,
+                null,
+                trackerEl,
+                trackerEl,
+                EMPTY_EVENT
+              );
             },
             trackerEl,
             instance
           );
         } else if (eventName === "mount") {
           if (isFirstMount) {
-            sendEvent(trackerEl, tracker);
+            sendEvent(
+              tracker,
+              trackerEl,
+              null,
+              trackerEl,
+              trackerEl,
+              EMPTY_EVENT
+            );
           }
         } else {
           let targetElement = targetSelector
@@ -214,9 +344,20 @@ export function mountTracking<NodeType>(
             : trackerEl;
 
           addInstanceDisposer(
-            host.on(targetElement, eventName, () => {
-              sendEvent(trackerEl, tracker);
-            }),
+            host.attachListener(
+              targetElement,
+              eventName,
+              (currentTarget, target, event) => {
+                sendEvent(
+                  tracker,
+                  trackerEl,
+                  null,
+                  currentTarget,
+                  target,
+                  event
+                );
+              }
+            ),
             targetElement,
             trackerEl
           );
@@ -248,45 +389,73 @@ export function mountTracking<NodeType>(
     }
 
     let trackerHost;
-    let trackerEl = host.getParent(triggerEl);
+    let trackerTarget = host.getParent(triggerEl);
 
     while (
-      trackerEl &&
+      trackerTarget &&
       trackerHost !== rootElement &&
-      !(trackerHost = trackerStore.get(trackerEl))
+      !(trackerHost = trackerStore.get(trackerTarget))
     ) {
-      trackerEl = host.getParent(trackerEl);
+      trackerTarget = host.getParent(trackerTarget)!;
     }
 
-    if (!trackerHost || !trackerEl) {
+    if (!trackerHost || !trackerTarget) {
       console.warn("could not find host for trigger element", triggerEl);
       return;
     }
 
+    const trackerEl = trackerTarget;
+
     if (triggers) {
       for (let trigger of triggers) {
-        const [_, eventName, __] = trigger;
+        const [_, eventName, __, selector] = trigger;
 
-        console.log(eventName);
+        const currentTarget = host.getEventTargetElement(trackerEl, selector);
 
         if (eventName === "unmount") {
           addInstanceDisposer(
-            () => sendEvent(trackerEl!, trigger),
+            () =>
+              sendEvent(
+                trigger,
+                trackerEl,
+                triggerEl,
+                currentTarget,
+                triggerEl,
+                {}
+              ),
             triggerEl,
             trackerEl,
             instance
           );
         } else if (eventName === "mount") {
           if (isFirstMount) {
-            sendEvent(trackerEl, trigger);
+            sendEvent(
+              trigger,
+              trackerEl,
+              triggerEl,
+              currentTarget,
+              triggerEl,
+              {}
+            );
           }
         } else {
-          let targetElement = triggerEl;
+          let targetElement = host.getEventTargetElement(trackerEl, selector);
 
           addInstanceDisposer(
-            host.on(targetElement, eventName, () => {
-              sendEvent(trackerEl!, trigger);
-            }),
+            host.attachListener(
+              targetElement,
+              eventName,
+              (currentTarget, target, event) => {
+                sendEvent(
+                  trigger,
+                  trackerEl!,
+                  triggerEl,
+                  currentTarget,
+                  target,
+                  event
+                );
+              }
+            ),
             targetElement,
             trackerEl,
             triggerEl
@@ -318,6 +487,10 @@ export function mountTracking<NodeType>(
       ctxParents.set(trackerEl, getCtxParents(trackerEl));
 
       attachTrackerEvents(trackerEl, trackerInstance, true);
+
+      addInstanceDisposer(() => {
+        trackerStore.delete(trackerEl);
+      }, trackerEl);
     }
 
     const triggerElements = host.getTriggerElements(element);
@@ -332,12 +505,16 @@ export function mountTracking<NodeType>(
       triggersStore.set(triggerEl, triggerInstance);
 
       attachTriggerEvents(triggerEl, triggerInstance, true);
+
+      addInstanceDisposer(() => {
+        triggersStore.delete(triggerEl);
+      }, triggerEl);
     }
   }
 
   function onChanged(element: NodeType) {
     if (paramsStore.has(element)) {
-      paramsStore.set(element, null);
+      paramsStore.set(element, PARAM_NEEDS_RECOMPUTE);
     }
 
     if (host.isTrackerElement(element)) {
@@ -370,6 +547,7 @@ export function mountTracking<NodeType>(
     Keys are added in parent -> child order, so we want to remove them in child -> parent order
     */
     const childFirstKeys = [...disposersStore.keys()].reverse();
+
     for (let el of childFirstKeys) {
       if (isTrackerInstance(el) || isTriggerInstance(el)) continue;
       if (host.isParentOf(removedElement, el)) {

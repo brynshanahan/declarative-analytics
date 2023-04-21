@@ -5,26 +5,43 @@ import { trackerParams, tracker, track } from "./tracker";
 
 const appParams = trackerParams({
   user: {
-    id: 1,
+    id: 3,
   },
 }); // the same as writing `data-tr-params="{ "user": { "id": 1 }}"
 
-const transactionTracking = tracker({
-  params: {
-    transaction_name: "My Transaction",
-  },
-  track: [track("submit", null, "myApplicationSubmitEvent")],
-});
-
 export default function App() {
   const [open, setOpen] = useState(false);
+
+  const transactionTracking = tracker({
+    params: {
+      transaction_name: "My Transaction",
+    },
+    enabled: open,
+    track: [track("submit", null, "myApplicationSubmitEvent", { test: 1 })],
+  });
+
+  if (!open) {
+    return (
+      <div {...appParams}>
+        {open ? "Open" : "Closed"}
+        <button
+          type="button"
+          onClick={(e) => {
+            setOpen(!open);
+          }}
+        >
+          Toggle
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div {...appParams}>
       {open ? "Open" : "Closed"}
       {
         <form
-          {...(open && transactionTracking)}
+          {...transactionTracking}
           onSubmit={(e) => {
             e.preventDefault();
           }}

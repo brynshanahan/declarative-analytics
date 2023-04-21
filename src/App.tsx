@@ -7,7 +7,7 @@ const appParams = trackerParams({
   user: {
     id: 1,
   },
-});
+}); // the same as writing `data-tr-params="{ "user": { "id": 1 }}"
 
 const transactionTracking = tracker({
   params: {

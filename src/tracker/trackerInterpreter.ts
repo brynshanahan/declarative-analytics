@@ -115,7 +115,7 @@ export function mountTracking<NodeType>(
         let param = paramsStore.get(ctxEl);
 
         if (param === null) {
-          param = host.getParams(element);
+          param = host.getParams(ctxEl);
           paramsStore.set(ctxEl, param);
         }
         if (param === undefined) {
